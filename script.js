@@ -1,53 +1,118 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const status = document.getElementById("status");
+const restartBtn = document.getElementById("restartBtn");
 
-let shapes = [];
+const box = 20;
+let snake, direction, score, food, bomb, gameOver, game;
 
-// Creăm mai multe forme: cercuri, pătrate, triunghiuri
-function createShapes() {
-  for (let i = 0; i < 10; i++) {
-    shapes.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      dx: (Math.random() - 0.5) * 4,
-      dy: (Math.random() - 0.5) * 4,
-      size: 20 + Math.random() * 30,
-      type: ["circle", "square", "triangle"][Math.floor(Math.random() * 3)],
-      color: `hsl(${Math.random() * 360}, 70%, 50%)`
-    });
+function initGame() {
+  snake = [{x: 9*box, y: 10*box}];
+  direction = "RIGHT";
+  score = 0;
+  gameOver = false;
+  food = randomPosition();
+  bomb = randomPosition();
+  restartBtn.style.display = "none";
+  status.textContent = "Scor: " + score;
+  clearInterval(game);
+  game = setInterval(draw, 120);
+}
+
+function randomPosition() {
+  return {
+    x: Math.floor(Math.random()*29+1) * box,
+    y: Math.floor(Math.random()*19+1) * box
+  };
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+  if (e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+  if (e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+  if (e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+});
+
+restartBtn.addEventListener("click", initGame);
+
+function drawSnakeSegment(x, y, isHead=false) {
+  ctx.fillStyle = isHead ? "limegreen" : "green";
+  ctx.beginPath();
+  ctx.roundRect(x, y, box, box, 6);
+  ctx.fill();
+  ctx.strokeStyle = "darkgreen";
+  ctx.strokeRect(x, y, box, box);
+}
+
+function draw() {
+  if (gameOver) {
+    ctx.fillStyle = "white";
+    ctx.font = "40px Arial";
+    ctx.fillText("GAME OVER", canvas.width/2 - 100, canvas.height/2);
+    status.textContent = "Scor final: " + score;
+    restartBtn.style.display = "inline-block";
+    clearInterval(game);
+    return;
   }
-}
 
-function drawShapes() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  shapes.forEach(shape => {
-    ctx.fillStyle = shape.color;
+  // desenăm șarpele
+  for (let i=0; i<snake.length; i++) {
+    drawSnakeSegment(snake[i].x, snake[i].y, i===0);
+  }
 
-    if (shape.type === "circle") {
-      ctx.beginPath();
-      ctx.arc(shape.x, shape.y, shape.size / 2, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (shape.type === "square") {
-      ctx.fillRect(shape.x, shape.y, shape.size, shape.size);
-    } else if (shape.type === "triangle") {
-      ctx.beginPath();
-      ctx.moveTo(shape.x, shape.y);
-      ctx.lineTo(shape.x + shape.size, shape.y);
-      ctx.lineTo(shape.x + shape.size / 2, shape.y - shape.size);
-      ctx.closePath();
-      ctx.fill();
+  // desenăm mărul (emoji 🍎)
+  ctx.font = "20px Arial";
+  ctx.fillText("🍎", food.x, food.y+box);
+
+  // desenăm bomba (emoji 💣)
+  ctx.font = "20px Arial";
+  ctx.fillText("💣", bomb.x, bomb.y+box);
+
+  // poziția capului
+  let snakeX = snake[0].x;
+  let snakeY = snake[0].y;
+
+  if (direction === "LEFT") snakeX -= box;
+  if (direction === "UP") snakeY -= box;
+  if (direction === "RIGHT") snakeX += box;
+  if (direction === "DOWN") snakeY += box;
+
+  // wrap-around pereți
+  if (snakeX < 0) snakeX = canvas.width - box;
+  if (snakeX >= canvas.width) snakeX = 0;
+  if (snakeY < 0) snakeY = canvas.height - box;
+  if (snakeY >= canvas.height) snakeY = 0;
+
+  // dacă mănâncă mărul
+  if (snakeX === food.x && snakeY === food.y) {
+    score++;
+    food = randomPosition();
+  } else {
+    snake.pop();
+  }
+
+  // dacă atinge bomba
+  if (snakeX === bomb.x && snakeY === bomb.y) {
+    gameOver = true;
+  }
+
+  // noul cap
+  let newHead = {x: snakeX, y: snakeY};
+
+  // coliziune cu corpul
+  for (let i=0; i<snake.length; i++) {
+    if (snakeX === snake[i].x && snakeY === snake[i].y) {
+      gameOver = true;
     }
+  }
 
-    // mișcare
-    shape.x += shape.dx;
-    shape.y += shape.dy;
+  snake.unshift(newHead);
 
-    // coliziuni cu marginile
-    if (shape.x < 0 || shape.x + shape.size > canvas.width) shape.dx *= -1;
-    if (shape.y < 0 || shape.y + shape.size > canvas.height) shape.dy *= -1;
-  });
+  status.textContent = "Scor: " + score;
 }
 
-createShapes();
-setInterval(drawShapes, 30);
+// start joc
+initGame();
+
